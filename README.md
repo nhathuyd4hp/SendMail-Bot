@@ -131,7 +131,3 @@ POST <YOUR_SCRIPT_URL>
 - `row`: Dòng trong sheet (bắt đầu từ 1, không tính tiêu đề)
 - `data`: Danh sách giá trị cần thêm hoặc cập nhật
 - `color`: Mã màu HEX để tô nền
-
-## 📌 Liên hệ
-
-Nếu gặp vấn đề hoặc cần hỗ trợ, hãy liên hệ [your-email@example.com]
