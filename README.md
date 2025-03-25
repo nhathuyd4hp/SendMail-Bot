@@ -1,6 +1,6 @@
 # Google Sheets API
 
-API này cung cấp các phương thức để thao tác với Google Sheets thông qua các phương thức HTTP (`GET`, `POST`, `PUT`, `DELETE`).
+API này cung cấp các phương thức để thao tác với Google Sheets thông qua các phương thức HTTP (`GET`, `POST`).
 
 ## 🚀 Hướng dẫn cài đặt
 
