@@ -2,7 +2,6 @@ import os
 import re
 import time
 import logging
-import zipfile
 from urllib.parse import urljoin
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
