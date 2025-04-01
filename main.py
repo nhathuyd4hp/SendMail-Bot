@@ -49,6 +49,7 @@ if __name__ == "__main__":
             logger_name="GoogleSheet"
         )
         mail_dealer = MailDealer(
+            url = "https://mds3310.maildealer.jp/",
             username="vietnamrpa",
             password="nsk159753",
             timeout=TIME_OUT,
@@ -65,6 +66,8 @@ if __name__ == "__main__":
             download_directory=SHAREPOINT_DOWNLOAD_PATH,
         )
         if not (share_point.authenticated and mail_dealer.authenticated):
+            del share_point
+            del mail_dealer
             continue
         # Process
         MAILS:list[dict] = []

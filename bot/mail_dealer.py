@@ -40,6 +40,7 @@ class MailDealer:
     # Init
     def __init__(
         self,
+        url:str,
         username: str,
         password: str,
         timeout: int = 10,
@@ -59,6 +60,7 @@ class MailDealer:
         self.browser = webdriver.Chrome(options=options)
         self.browser.maximize_window()
         self.timeout = timeout
+        self.url = url
         self.wait = WebDriverWait(self.browser, timeout)
         self.username = username
         self.password = password
@@ -113,7 +115,7 @@ class MailDealer:
     @switch_to_default_content
     def __authentication(self, username: str, password: str) -> bool:
         time.sleep(0.5)
-        self.browser.get('https://mds3310.maildealer.jp/')
+        self.browser.get(self.url)
         try:
             username_field = self.wait.until(
                 EC.presence_of_element_located((By.ID, 'fUName')),
@@ -266,7 +268,7 @@ class MailDealer:
     def read_mail(self, mail_box: str,mail_id:str,tab_name:str=None) -> str:
         try:
             content = ""
-            if not self.browser.current_url.startswith('https://md29.maildealer.jp/app/'):
+            if not self.browser.current_url.endswith("/app"):
                 self.__authentication(self.username, self.password)
             self.__open_mail_box(
                 mail_box=mail_box,

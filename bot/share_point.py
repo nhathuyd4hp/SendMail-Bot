@@ -62,28 +62,33 @@ class SharePoint:
         return True
 
     def __wait_download_finish(self) -> bool:
-        self.browser.get("chrome://downloads/")
-        download_items:list[WebElement] = self.browser.execute_script("""
-            return document.
-            querySelector("downloads-manager").shadowRoot
-            .querySelector("#mainContainer")
-            .querySelector("#downloadsList")
-            .querySelector("#list")
-            .querySelectorAll("downloads-item")
-        """)
-        for item in download_items:
-            quick_show_in_folder = self.browser.execute_script(f"""
-                return document
-                .querySelector("downloads-manager").shadowRoot
+        try:
+            self.browser.get("chrome://downloads/")
+            download_items:list[WebElement] = self.browser.execute_script("""
+                return document.
+                querySelector("downloads-manager").shadowRoot
+                .querySelector("#mainContainer")
                 .querySelector("#downloadsList")
                 .querySelector("#list")
-                .querySelector("#{item.get_attribute("id")}").shadowRoot
-                .querySelector("#quick-show-in-folder")
+                .querySelectorAll("downloads-item")
             """)
-            if not isinstance(quick_show_in_folder,WebElement):
-                time.sleep(5)
-                return False
-        return True
+            for item in download_items:
+                quick_show_in_folder = self.browser.execute_script(f"""
+                    return document
+                    .querySelector("downloads-manager").shadowRoot
+                    .querySelector("#downloadsList")
+                    .querySelector("#list")
+                    .querySelector("#{item.get_attribute("id")}").shadowRoot
+                    .querySelector("#quick-show-in-folder")
+                """)
+                if not isinstance(quick_show_in_folder,WebElement):
+                    time.sleep(5)
+                    return False
+            return True
+        except ElementNotInteractableException:
+            return self.__wait_download_finish()
+        except Exception:
+            return False
         
     def __authentication(self, username: str, password: str) -> bool:
         time.sleep(0.5)
@@ -163,6 +168,8 @@ class SharePoint:
                 return True
             else:
                 return False
+        except ElementNotInteractableException:
+            return self.__authentication(username,password)
         except TimeoutException as e:
             return False
         except Exception as e:
