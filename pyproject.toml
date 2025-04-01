@@ -11,7 +11,9 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
     "pip>=25.0.1",
+    "pygetwindow>=0.0.9",
     "pygsheets>=2.0.6",
+    "pywinauto>=0.6.9",
     "requests>=2.32.3",
     "selenium>=4.29.0",
 ]

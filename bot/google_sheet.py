@@ -44,7 +44,7 @@ class GoogleSheet:
                 # ------- #
                 sheet = pd.DataFrame(data,columns=columns)
                 # ------- #
-                sheet['background'] = [list(set(background)) for background in content['backgrounds'][1:]]
+                sheet['background'] = [background for background in content['backgrounds'][1:]]
                 return (sheet_name,sheet)
         else:
             self.logger.error("Lỗi đọc dữ liệu từ Google Sheet")
