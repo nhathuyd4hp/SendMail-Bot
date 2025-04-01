@@ -7,7 +7,7 @@ from typing import Union
 import pandas as pd
 from pywinauto import Application
 from pywinauto.application import Application,WindowSpecification
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException,ElementClickInterceptedException,NoSuchElementException,StaleElementReferenceException
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
@@ -341,211 +341,124 @@ class MailDealer:
     ) -> tuple[bool,str]:
         options = {key: value for key, value in locals().items() if value and key not in ["self", "mail_id","attached"]}
         self.logger.info(f"Reply Mail {mail_id}: {options}")
+        # Search
+        search_input = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"input[placeholder='このメールボックスのメール・電話を検索']"))
+        )
+        search_input.clear()
+        search_input.send_keys(mail_id)
+        # search
+        self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='検索']"))
+        )
+        search_btn = self.wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR,"button[title='検索']"))
+        )
+        search_btn.click()
+        # Wait loader
+        time.sleep(0.5)
+        WebDriverWait(self.browser, 120).until(
+            EC.invisibility_of_element_located((By.CSS_SELECTOR, "div[class='loader']"))
+        )
+        time.sleep(0.5)
+        # Switch frame
+        ifame = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"iframe[id='ifmMain']"))
+        )
+        self.browser.switch_to.frame(ifame)
+        # Check Maillist
         try:
-            # Search
-            search_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"input[placeholder='このメールボックスのメール・電話を検索']"))
-            )
-            search_input.clear()
-            search_input.send_keys(mail_id)
-            # search
             self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='検索']"))
+                EC.presence_of_element_located((By.CSS_SELECTOR,"span[id='maillist']"))
             )
-            search_btn = self.wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR,"button[title='検索']"))
-            )
-            search_btn.click()
-            # Wait loader
-            time.sleep(0.5)
-            WebDriverWait(self.browser, 120).until(
-                EC.invisibility_of_element_located((By.CSS_SELECTOR, "div[class='loader']"))
-            )
-            time.sleep(0.5)
-            # Switch frame
-            ifame = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"iframe[id='ifmMain']"))
-            )
-            self.browser.switch_to.frame(ifame)
-            # Check Maillist
-            try:
-                self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR,"span[id='maillist']"))
-                )
-                self.logger.info(f"Không tìm thấy mail (id:{mail_id})")
-                return (False,f"Không tìm thấy mail (id:{mail_id})")
-            except TimeoutException:
-                pass
-            olv_p_mail_page__content = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='olv-p-mail-page__content']"))
-            )
-            snackbar__wrap = olv_p_mail_page__content.find_elements(By.CSS_SELECTOR,"div[class='snackbar__wrap']")
-            if snackbar__wrap:
-                msg = ", ".join([e.text for e in snackbar__wrap])
-                if not msg == 'このメールは「返信処理中」です。':
-                    self.logger.info(f"Mail {mail_id}: {msg}")
-                    return (False,msg)
-            olv_p_mail_ops__act_reply = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='olv-p-mail-ops__act-reply']"))
-            )
-            # accent_btn__btn_wrap = olv_p_mail_ops__act_reply.find_element(By.CSS_SELECTOR,"span[class='accent-btn__btn-wrap']") What is this?
+            self.logger.info(f"Không tìm thấy mail (id:{mail_id})")
+            return (False,f"Không tìm thấy mail (id:{mail_id})")
+        except TimeoutException:
+            pass
+        olv_p_mail_page__content = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='olv-p-mail-page__content']"))
+        )
+        snackbar__wrap = olv_p_mail_page__content.find_elements(By.CSS_SELECTOR,"div[class='snackbar__wrap']")
+        if snackbar__wrap:
+            msg = ", ".join([e.text for e in snackbar__wrap])
+            if not msg == 'このメールは「返信処理中」です。':
+                self.logger.info(f"Mail {mail_id}: {msg}")
+                return (False,msg)
+        olv_p_mail_ops__act_reply = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='olv-p-mail-ops__act-reply']"))
+        )
+        # accent_btn__btn_wrap = olv_p_mail_ops__act_reply.find_element(By.CSS_SELECTOR,"span[class='accent-btn__btn-wrap']") What is this?
+        menu = olv_p_mail_ops__act_reply.find_element(By.CSS_SELECTOR,"div[class='menu']")
+        if options:
+            menu.click()
+            time.sleep(2)  
             menu = olv_p_mail_ops__act_reply.find_element(By.CSS_SELECTOR,"div[class='menu']")
-            if options:
-                menu.click()
-                time.sleep(2)  
-                menu = olv_p_mail_ops__act_reply.find_element(By.CSS_SELECTOR,"div[class='menu']")
-                sections = menu.find_elements(By.XPATH,".//section")
-                sections = [section for section in sections if section.find_element(By.TAG_NAME,'label').text in options]
-                for section in sections:
-                    div_control = section.find_element(By.XPATH,"./div")
-                    # Radio
-                    if ops := div_control.find_elements(By.CSS_SELECTOR,"label[class^='radio']"):
-                        label = section.find_element(By.XPATH, "./label") 
-                        target_option = options.get(label.text)
-                        target_op = next((op for op in ops if op.text == target_option), None)
-                        if target_op:
-                            target_op.click()
-                    # Checkbox                            
-                    if ops := div_control.find_elements(By.CSS_SELECTOR,"label[class^='checkbox']"):
-                        label = section.find_element(By.XPATH, "./label")
-                        pass
-                    # Dropdown
-                    if ops := div_control.find_elements(By.CSS_SELECTOR,"div[class^='dropdown ']"):
-                        label = section.find_element(By.XPATH, "./label")
-                        target_option = [options.get(label.text)] if isinstance(options.get(label.text), str) else options.get(label.text)
-                        for index,op in enumerate(ops):
-                            label.click()
-                            op.click()
-                            time.sleep(1)
-                            lis = self.browser.find_elements(By.XPATH,f".//li[text()='{target_option[index]}']") 
-                            if len(lis) == 1:
-                                lis[0].click()
-                            else:
-                                self.logger.error(f"Không tìm thấy {label.text}:{target_option[index]}")
-                                return (False,f"Không tìm thấy {label.text}:{target_option[index]}")
-            # メール作成
-            # ---- #
-            button = menu.find_element(By.TAG_NAME,'footer').find_element(By.TAG_NAME,'button')
-            self.wait.until(EC.element_to_be_clickable(button))
-            current_windows = self.browser.window_handles
-            button.click()
-            # Wait for Open New Windows
-            while len(self.browser.window_handles) <= len(current_windows):
-                continue
-            window_ids:set= set(self.browser.window_handles) - set(current_windows)
-            while window_ids:
-                email = None
-                last_name = None
-                id = window_ids.pop()
-                self.browser.switch_to.window(id)
-                self.browser.maximize_window()
-                # 
-                time.sleep(5)
-                olv_p_mail_edit_section = self.wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR,"section[class='olv-p-mail-edit__section']")
-                    )
-                )
-                olv_p_mail_edit__dl_olv_u_mbs:list[WebElement] = olv_p_mail_edit_section.find_elements(By.CSS_SELECTOR,"div[class^='olv-p-mail-edit__dl olv-u-mb--']")
-                for olv_p_mail_edit__dl_olv_u_mb in olv_p_mail_edit__dl_olv_u_mbs:
-                    if olv_p_mail_edit__dl_olv_u_mb.find_elements(By.XPATH, ".//span[text()='To']"):
-                        olv_p_mail_edit__dd = olv_p_mail_edit__dl_olv_u_mb.find_element(By.CSS_SELECTOR,"div[class='olv-p-mail-edit__dd']")
-                        olv_p_mail_edit__dd_input = olv_p_mail_edit__dd.find_element(By.TAG_NAME,"input")
-                        ToEmail = olv_p_mail_edit__dd_input.get_attribute('value')
-                        match = re.search(r"<([^<>]+)>", ToEmail)
-                        if match:
-                            email:str = match.group(1)  
-                            last_name = email_to_lastname.get(email.lower(),None)
-                        break
-                    
-
-                if not email or not last_name:
-                    cancelButton = self.wait.until(
-                        EC.presence_of_element_located((By.XPATH, ".//button[text()='キャンセル']"))
-                    )
-                    self.wait.until(
-                        EC.element_to_be_clickable(cancelButton)
-                    ).click()
-                    time.sleep(2)
-                    try:
-                        alert = self.wait.until(EC.alert_is_present())
-                        alert.accept()
-                    except Exception:
-                        pass
-                    self.browser.switch_to.window(current_windows[0])     
-                    self.logger.info(f"Reply Mail {mail_id} thất bại: {email} không phù hợp")    
-                    return False,f"Reply Mail {mail_id} thất bại: {email} không phù hợp"
-                # -- Content
-                content = None
-                self.wait.until(
-                    EC.frame_to_be_available_and_switch_to_it((By.TAG_NAME,'iframe'))
-                )
-                body = self.wait.until(
-                    EC.presence_of_element_located((By.TAG_NAME,'body'))
-                )
-                if divs := body.find_elements(By.XPATH,'./div'):
-                    for div in divs:
-                        if "○○" in div.get_attribute("innerHTML"):
-                            new_html = div.get_attribute("innerHTML").replace("○○", last_name)
-                            self.browser.execute_script("arguments[0].innerHTML = arguments[1];", div, new_html)
-                            content = new_html.replace("<br>","\n")
-                            time.sleep(2)
-                            break
-                self.browser.switch_to.default_content()
-                # -- Attached
-                if attached:
-                    time.sleep(1)
-                    for path in attached:
-                        success = True
-                        error = ""
-                        button = self.wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='添付ファイル']"))
-                        )
-                        while True:
-                            try:
-                                self.wait.until(
-                                    EC.element_to_be_clickable(button)
-                                ).click()
-                                break
-                            except ElementClickInterceptedException:
-                                continue
+            sections = menu.find_elements(By.XPATH,".//section")
+            sections = [section for section in sections if section.find_element(By.TAG_NAME,'label').text in options]
+            for section in sections:
+                div_control = section.find_element(By.XPATH,"./div")
+                # Radio
+                if ops := div_control.find_elements(By.CSS_SELECTOR,"label[class^='radio']"):
+                    label = section.find_element(By.XPATH, "./label") 
+                    target_option = options.get(label.text)
+                    target_op = next((op for op in ops if op.text == target_option), None)
+                    if target_op:
+                        target_op.click()
+                # Checkbox                            
+                if ops := div_control.find_elements(By.CSS_SELECTOR,"label[class^='checkbox']"):
+                    label = section.find_element(By.XPATH, "./label")
+                    pass
+                # Dropdown
+                if ops := div_control.find_elements(By.CSS_SELECTOR,"div[class^='dropdown ']"):
+                    label = section.find_element(By.XPATH, "./label")
+                    target_option = [options.get(label.text)] if isinstance(options.get(label.text), str) else options.get(label.text)
+                    for index,op in enumerate(ops):
+                        label.click()
+                        op.click()
                         time.sleep(1)
-                        
-                        open_application: Application = Application(backend="win32").connect(title="Open")
-                        dialog_file_upload: WindowSpecification = open_application.window(title="Open")      
-                                        
-                        dialog_file_upload.child_window(class_name="Edit").type_keys(str(Path(path)).replace("(", "{(}").replace(")", "{)}"),with_spaces=True)
-                        time.sleep(2)
-                        dialog_file_upload.child_window(title="&Open", class_name="Button").wrapper_object().click() 
-                        time.sleep(2)   
-                        try:    
-                            alert = self.wait.until(
-                                EC.alert_is_present()
-                            )
-                            if alert.text == "添付可能なファイル容量の上限は20MBです。":
-                                self.logger.info(f"Đính kèm {path} thất bại: 添付可能なファイル容量の上限は20MBです。")
-                                alert.accept()
-                                success = False
-                                error = "添付可能なファイル容量の上限は20MBです。"
-                                break
-                        except TimeoutException:
-                            pass
-                         
-                        while open_windows := pywinauto.findwindows.find_elements(title="Open"):
-                            success = False
-                            error = f"{path} not found"
-                            for w in open_windows:
-                                w: WindowSpecification = Application().connect(handle=w.handle).window(handle=w.handle)
-                                if w.child_window(title="OK", class_name="Button").exists():
-                                    w.child_window(title="OK", class_name="Button").wrapper_object().click()
-                                if w.child_window(title="Cancel", class_name="Button").exists():
-                                    w.child_window(title="Cancel", class_name="Button").wrapper_object().click()
-                        #----------#
-                        if not success:
-                            self.logger.info(f"Đính kèm {path} thất bại")
-                            return success,error
-                        self.logger.info(f"Đính kèm {path} thành công")    
+                        lis = self.browser.find_elements(By.XPATH,f".//li[text()='{target_option[index]}']") 
+                        if len(lis) == 1:
+                            lis[0].click()
+                        else:
+                            self.logger.error(f"Không tìm thấy {label.text}:{target_option[index]}")
+                            return (False,f"Không tìm thấy {label.text}:{target_option[index]}")
+        # メール作成
+        # ---- #
+        button = menu.find_element(By.TAG_NAME,'footer').find_element(By.TAG_NAME,'button')
+        self.wait.until(EC.element_to_be_clickable(button))
+        current_windows = self.browser.window_handles
+        button.click()
+        # Wait for Open New Windows
+        while len(self.browser.window_handles) <= len(current_windows):
+            continue
+        window_ids:set= set(self.browser.window_handles) - set(current_windows)
+        while window_ids:
+            email = None
+            last_name = None
+            id = window_ids.pop()
+            self.browser.switch_to.window(id)
+            self.browser.maximize_window()
+            # 
+            time.sleep(5)
+            olv_p_mail_edit_section = self.wait.until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR,"section[class='olv-p-mail-edit__section']")
+                )
+            )
+            olv_p_mail_edit__dl_olv_u_mbs:list[WebElement] = olv_p_mail_edit_section.find_elements(By.CSS_SELECTOR,"div[class^='olv-p-mail-edit__dl olv-u-mb--']")
+            for olv_p_mail_edit__dl_olv_u_mb in olv_p_mail_edit__dl_olv_u_mbs:
+                if olv_p_mail_edit__dl_olv_u_mb.find_elements(By.XPATH, ".//span[text()='To']"):
+                    olv_p_mail_edit__dd = olv_p_mail_edit__dl_olv_u_mb.find_element(By.CSS_SELECTOR,"div[class='olv-p-mail-edit__dd']")
+                    olv_p_mail_edit__dd_input = olv_p_mail_edit__dd.find_element(By.TAG_NAME,"input")
+                    ToEmail = olv_p_mail_edit__dd_input.get_attribute('value')
+                    match = re.search(r"<([^<>]+)>", ToEmail)
+                    if match:
+                        email:str = match.group(1)  
+                        last_name = email_to_lastname.get(email.lower(),None)
+                    break
                 
+
+            if not email or not last_name:
                 cancelButton = self.wait.until(
                     EC.presence_of_element_located((By.XPATH, ".//button[text()='キャンセル']"))
                 )
@@ -559,36 +472,94 @@ class MailDealer:
                 except Exception:
                     pass
                 self.browser.switch_to.window(current_windows[0])     
-                self.logger.info(f"Reply Mail {mail_id} thành công")
-                return True,content
-
-        except NoSuchElementException as e:
-            self.logger.error(e)
-            return (False,e)
-        except StaleElementReferenceException:
-            return self.reply(
-                mail_id=mail_id,
-                返信先=返信先,
-                引用=引用,
-                ToFrom=ToFrom,
-                署名=署名,
-                テンプレート=テンプレート,
-                attached=attached,
+                self.logger.info(f"Reply Mail {mail_id} thất bại: {email} không phù hợp")    
+                return False,f"Reply Mail {mail_id} thất bại: {email} không phù hợp"
+            # -- Content
+            content = None
+            self.wait.until(
+                EC.frame_to_be_available_and_switch_to_it((By.TAG_NAME,'iframe'))
             )
-        except ElementClickInterceptedException:
-            return self.reply(
-                mail_id=mail_id,
-                返信先=返信先,
-                引用=引用,
-                ToFrom=ToFrom,
-                署名=署名,
-                テンプレート=テンプレート,
-                attached=attached,
+            body = self.wait.until(
+                EC.presence_of_element_located((By.TAG_NAME,'body'))
             )
-        except Exception as e:
-            self.logger.warning(e)
-            return False,e
+            if divs := body.find_elements(By.XPATH,'./div'):
+                for div in divs:
+                    if "○○" in div.get_attribute("innerHTML"):
+                        new_html = div.get_attribute("innerHTML").replace("○○", last_name)
+                        self.browser.execute_script("arguments[0].innerHTML = arguments[1];", div, new_html)
+                        content = new_html.replace("<br>","\n")
+                        time.sleep(2)
+                        break
+            self.browser.switch_to.default_content()
+            # -- Attached
+            if attached:
+                time.sleep(1)
+                for path in attached:
+                    success = True
+                    error = ""
+                    button = self.wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='添付ファイル']"))
+                    )
+                    while True:
+                        try:
+                            self.wait.until(
+                                EC.element_to_be_clickable(button)
+                            ).click()
+                            break
+                        except ElementClickInterceptedException:
+                            continue
+                    time.sleep(1)
+                    
+                    open_application: Application = Application(backend="win32").connect(title="Open")
+                    dialog_file_upload: WindowSpecification = open_application.window(title="Open")      
+                                    
+                    dialog_file_upload.child_window(class_name="Edit").type_keys(str(Path(path)).replace("(", "{(}").replace(")", "{)}"),with_spaces=True)
+                    time.sleep(2)
+                    dialog_file_upload.child_window(title="&Open", class_name="Button").wrapper_object().click() 
+                    time.sleep(2)   
+                    try:    
+                        alert = self.wait.until(
+                            EC.alert_is_present()
+                        )
+                        if alert.text == "添付可能なファイル容量の上限は20MBです。":
+                            self.logger.info(f"Đính kèm {path} thất bại: 添付可能なファイル容量の上限は20MBです。")
+                            alert.accept()
+                            success = False
+                            error = "添付可能なファイル容量の上限は20MBです。"
+                            break
+                    except TimeoutException:
+                        pass
+                        
+                    while open_windows := pywinauto.findwindows.find_elements(title="Open"):
+                        success = False
+                        error = f"{path} not found"
+                        for w in open_windows:
+                            w: WindowSpecification = Application().connect(handle=w.handle).window(handle=w.handle)
+                            if w.child_window(title="OK", class_name="Button").exists():
+                                w.child_window(title="OK", class_name="Button").wrapper_object().click()
+                            if w.child_window(title="Cancel", class_name="Button").exists():
+                                w.child_window(title="Cancel", class_name="Button").wrapper_object().click()
+                    #----------#
+                    if not success:
+                        self.logger.info(f"Đính kèm {path} thất bại")
+                        return success,error
+                    self.logger.info(f"Đính kèm {path} thành công")    
             
+            cancelButton = self.wait.until(
+                EC.presence_of_element_located((By.XPATH, ".//button[text()='キャンセル']"))
+            )
+            self.wait.until(
+                EC.element_to_be_clickable(cancelButton)
+            ).click()
+            time.sleep(2)
+            try:
+                alert = self.wait.until(EC.alert_is_present())
+                alert.accept()
+            except Exception:
+                pass
+            self.browser.switch_to.window(current_windows[0])     
+            self.logger.info(f"Reply Mail {mail_id} thành công")
+            return True,content      
         
             
               
