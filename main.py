@@ -49,6 +49,7 @@ if __name__ == "__main__":
             logger_name="GoogleSheet"
         )
         mail_dealer = MailDealer(
+            url="https://mds3310.maildealer.jp/",
             username="vietnamrpa",
             password="nsk159753",
             timeout=TIME_OUT,

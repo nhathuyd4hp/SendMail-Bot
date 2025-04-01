@@ -7,21 +7,14 @@ from typing import Union
 import pandas as pd
 from pywinauto import Application
 from pywinauto.application import Application,WindowSpecification
+from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.common.exceptions import (
-    TimeoutException,
-    NoSuchElementException,
-    StaleElementReferenceException,
-    WebDriverException,
-    InvalidSessionIdException,
-    ElementClickInterceptedException,
-)
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+from common import HandleException
 
 email_to_lastname = {
     "junichiro.kawakatsu@kaneka.co.jp":"川勝",
@@ -40,6 +33,7 @@ class MailDealer:
     # Init
     def __init__(
         self,
+        url:str,
         username: str,
         password: str,
         timeout: int = 10,
@@ -59,6 +53,7 @@ class MailDealer:
         self.browser = webdriver.Chrome(options=options)
         self.browser.maximize_window()
         self.timeout = timeout
+        self.url = url
         self.wait = WebDriverWait(self.browser, timeout)
         self.username = username
         self.password = password
@@ -72,33 +67,15 @@ class MailDealer:
             except:
                 pass
             
-    # Decorator 
-    def handle_exception(func):
-        def wrapper(self:"MailDealer", *args, **kwargs):
-            try:
-                return func(self, *args, **kwargs)  
-            except WebDriverException:
-                return func(self, *args, **kwargs)  
-            except ElementClickInterceptedException:
-                return func(self, *args, **kwargs)  
-            except StaleElementReferenceException:
-                return func(self, *args, **kwargs)
-            except InvalidSessionIdException as e:
-                self.logger.warning(e)
-                return None
-            except Exception as e:
-                self.logger.warning(e)
-                return None
-        return wrapper
-    
-    @handle_exception
+   
+    @HandleException
     def switch_to_default_content(func) : 
         def wrapper(self, *args, **kwargs):
             self.browser.switch_to.default_content()
             return func(self, *args, **kwargs)
         return wrapper 
     
-    @handle_exception
+    @HandleException
     def login_required(func) : 
         def wrapper(self, *args, **kwargs):
             if not self.authenticated:
@@ -111,48 +88,45 @@ class MailDealer:
     
     # Method  
     @switch_to_default_content
+    @HandleException
     def __authentication(self, username: str, password: str) -> bool:
-        time.sleep(0.5)
-        self.browser.get('https://mds3310.maildealer.jp/')
+        time.sleep(1)
+        self.browser.get(self.url)
+        username_field = self.wait.until(
+            EC.presence_of_element_located((By.ID, 'fUName')),
+        )
+        username_field.send_keys(username)
+
+        password_field = self.wait.until(
+            EC.presence_of_element_located((By.ID, 'fPassword')),
+        )
+        password_field.send_keys(password)
+
+        self.wait.until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "input[value='ログイン']"),
+            ),
+        )
+        login_btn = self.wait.until(
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, "input[value='ログイン']"),
+            ),
+        )
+        login_btn.click()
         try:
-            username_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, 'fUName')),
-            )
-            username_field.send_keys(username)
-
-            password_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, 'fPassword')),
-            )
-            password_field.send_keys(password)
-
             self.wait.until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "input[value='ログイン']"),
+                    (By.CSS_SELECTOR, "div[class='d_error_area ']"),
                 ),
             )
-            login_btn = self.wait.until(
-                EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, "input[value='ログイン']"),
-                ),
+            self.logger.error(
+                '❌ Xác thực thất bại! Kiểm tra thông tin đăng nhập.',
             )
-            login_btn.click()
-            try:
-                self.wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, "div[class='d_error_area ']"),
-                    ),
-                )
-                self.logger.error(
-                    '❌ Xác thực thất bại! Kiểm tra thông tin đăng nhập.',
-                )
-                return False
-            except TimeoutException:
-                if self.browser.current_url.find("app") != -1:
-                    self.logger.info('✅ Xác thực thành công!')
-                    return True
-                return False
-        except Exception as e:
-            self.logger.error(f'❌ Xác thực thất bại! {e.msg.split("(Session info:")[0].strip()}.')
+            return False
+        except TimeoutException:
+            if self.browser.current_url.find("app") != -1:
+                self.logger.info('✅ Xác thực thành công!')
+                return True
             return False
 
     
@@ -261,50 +235,48 @@ class MailDealer:
             self.logger.error(f'❌ Không thể lấy được danh sách mail: {mail_box}, tab: {tab_name}: {e}')
             return None
             
-    
+    @HandleException
     @login_required
     def read_mail(self, mail_box: str,mail_id:str,tab_name:str=None) -> str:
+        content = ""
+        if not self.browser.current_url.endswith('/app/'):
+            self.__authentication(self.username, self.password)
+        self.__open_mail_box(
+            mail_box=mail_box,
+            tab=tab_name,
+        )
+        self.wait.until(
+            EC.frame_to_be_available_and_switch_to_it(
+                (By.CSS_SELECTOR, "iframe[id='ifmMain']"),
+            ),
+        )
+        email_span = self.wait.until(
+            EC.presence_of_element_located((By.XPATH,f"//span[text()='{mail_id}']"))
+        )
+        email_span.click()
         try:
-            content = ""
-            if not self.browser.current_url.startswith('https://md29.maildealer.jp/app/'):
-                self.__authentication(self.username, self.password)
-            self.__open_mail_box(
-                mail_box=mail_box,
-                tab=tab_name,
-            )
             self.wait.until(
-                EC.frame_to_be_available_and_switch_to_it(
-                    (By.CSS_SELECTOR, "iframe[id='ifmMain']"),
-                ),
+                EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR,"iframe[id='html-mail-body-if']"))
             )
-            email_span = self.wait.until(
-                EC.presence_of_element_located((By.XPATH,f"//span[text()='{mail_id}']"))
+            ps = self.wait.until(
+                EC.presence_of_all_elements_located((By.TAG_NAME,'p'))
             )
-            email_span.click()
-            try:
-                self.wait.until(
-                    EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR,"iframe[id='html-mail-body-if']"))
+            for p in ps:
+                content += p.text + "\n"
+        except TimeoutException:
+            body = self.wait.until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR,"div[class='olv-p-mail-view-body']")
                 )
-                ps = self.wait.until(
-                    EC.presence_of_all_elements_located((By.TAG_NAME,'p'))
-                )
-                for p in ps:
-                    content += p.text + "\n"
-            except TimeoutException:
-                body = self.wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR,"div[class='olv-p-mail-view-body']")
-                    )
-                )
-                content = body.find_element(By.TAG_NAME,'pre').text
-            self.logger.info(f'✅ Đã đọc được nội dung mail:{mail_id}. tab: {tab_name} ở box:{mail_box}')
-            return content
-        except Exception as e:
-            self.logger.error(f'❌ Dọc nội dung mail:{mail_id} ở {mail_box} thất bại: {e}')
+            )
+            content = body.find_element(By.TAG_NAME,'pre').text
+        self.logger.info(f'✅ Đã đọc được nội dung mail:{mail_id}. tab: {tab_name} ở box:{mail_box}')
+        return content
     
-    
+    @HandleException
     @login_required
     def 一括操作(self,案件ID:any,このメールと同じ親番号のメールをすべて関連付ける:bool=False) -> tuple[bool,str]:
+        from selenium.common.exceptions import NoSuchElementException
         try:
             popup = self.wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='pop-panel__content']"))
