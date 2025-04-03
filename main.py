@@ -103,7 +103,7 @@ if __name__ == "__main__":
         for mail in MAILS:
             if mail.get("type") == 1:
                 if mail.get("sheet_name") == "KENTEC_1_T1_T6":
-                    result,note = mail_dealer.reply(
+                    result,note,attach = mail_dealer.reply(
                         mail_id=mail.get("mail_id"),
                         返信先="全員に返信",
                         署名="署名なし",
@@ -112,9 +112,9 @@ if __name__ == "__main__":
                             "KKT Box"
                         ],
                     )
-                    data.append({**mail, "result": result, "note": note})
+                    data.append({**mail, "result": result, "note": note,"attach":attach})
                 if mail.get("sheet_name") == "KENTEC_2_T1_T6":
-                    result,note = mail_dealer.reply(
+                    result,note,attach = mail_dealer.reply(
                         mail_id=mail.get("mail_id"),
                         返信先="全員に返信",
                         署名="署名なし",
@@ -123,7 +123,7 @@ if __name__ == "__main__":
                             "KFP Box"
                         ],
                     )
-                    data.append({**mail, "result": result, "note": note})
+                    data.append({**mail, "result": result, "note": note,"attach":attach})
             if mail.get("type") == 2:
                 mail_id:str = mail.get("mail_id")
                 folder = mail_id.replace("-1","")
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                 time.sleep(1)
                 files = [os.path.join(SHAREPOINT_DOWNLOAD_PATH,f) for f in files if re.search(r".*\.(pdf|xlsm|xlsx)$", f)]
                 if files:
-                    result,note = mail_dealer.reply(
+                    result,note,attach = mail_dealer.reply(
                         mail_id=mail.get("mail_id"),
                         返信先="全員に返信",
                         署名="署名なし",
@@ -161,8 +161,8 @@ if __name__ == "__main__":
                         ],
                         attached=files,
                     )
-                    data.append({**mail, "result": result, "note": note})           
-                
+                    data.append({**mail, "result": result, "note": note,"attach":attach})           
+        
                     
         data = pd.DataFrame(data)
         data.to_excel(f"{datetime.today().strftime("%Y-%m-%d_%H-%M-%S") }.xlsx",index=False)

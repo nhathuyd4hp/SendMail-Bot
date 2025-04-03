@@ -454,7 +454,7 @@ class MailDealer:
                     match = re.search(r"<([^<>]+)>", ToEmail)
                     if match:
                         email:str = match.group(1)  
-                        last_name = email_to_lastname.get(email.lower(),None)
+                        last_name = email_to_lastname.get(email.lower(),"ご担当者")
                     break
                 
 
@@ -492,6 +492,7 @@ class MailDealer:
                         break
             self.browser.switch_to.default_content()
             # -- Attached
+            attach = []
             if attached:
                 time.sleep(1)
                 for path in attached:
@@ -523,6 +524,7 @@ class MailDealer:
                         )
                         if alert.text == "添付可能なファイル容量の上限は20MBです。":
                             self.logger.info(f"Đính kèm {path} thất bại: 添付可能なファイル容量の上限は20MBです。")
+                            attach.append(path)
                             alert.accept()
                             success = False
                             error = "添付可能なファイル容量の上限は20MBです。"
@@ -542,24 +544,35 @@ class MailDealer:
                     #----------#
                     if not success:
                         self.logger.info(f"Đính kèm {path} thất bại")
+                        attach.append(path)
                         return success,error
                     self.logger.info(f"Đính kèm {path} thành công")    
+                    attach.append(path)
             
-            cancelButton = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, ".//button[text()='キャンセル']"))
-            )
-            self.wait.until(
-                EC.element_to_be_clickable(cancelButton)
-            ).click()
-            time.sleep(2)
-            try:
-                alert = self.wait.until(EC.alert_is_present())
-                alert.accept()
-            except Exception:
-                pass
+            while True:
+                try:
+                    div_menu = self.wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[class='menu']"))
+                    )
+                    children = div_menu.find_elements(By.XPATH,'./*')
+                    if(len(children)) == 1:
+                        child = children[0]
+                        button = child.find_element(By.TAG_NAME,'button')
+                        self.wait.until(EC.element_to_be_clickable(button)).click()
+                        continue
+                    else:
+                        button = self.wait.until(
+                            EC.presence_of_element_located((By.XPATH, ".//button[text()='一時保存']"))
+                        )
+                        self.wait.until(EC.element_to_be_clickable(button)).click()
+                        break
+                except TimeoutException:
+                    continue
+            
+            self.browser.close()
             self.browser.switch_to.window(current_windows[0])     
             self.logger.info(f"Reply Mail {mail_id} thành công")
-            return True,content      
+            return True,content,attach      
         
             
               
