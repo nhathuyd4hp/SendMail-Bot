@@ -100,11 +100,12 @@ class SharePoint:
         ).send_keys(username)
         time.sleep(0.5)
         # -- Next
-        self.wait.until(
+        btn = self.wait.until(
             EC.presence_of_element_located(
                 (By.ID,"idSIButton9")
             )
-        ).click()
+        )
+        self.wait.until(EC.element_to_be_clickable(btn)).click()
         time.sleep(1)
         # -- Check usernameError
         try:
@@ -125,11 +126,12 @@ class SharePoint:
         ).send_keys(password)
         time.sleep(0.5)
         # -- Sign in
-        self.wait.until(
+        btn = self.wait.until(
             EC.presence_of_element_located(
                 (By.ID,"idSIButton9")
             )
-        ).click()
+        )
+        self.wait.until(EC.element_to_be_clickable(btn)).click()
         time.sleep(0.5)
         # -- Check stay signed in
         try:
@@ -148,12 +150,12 @@ class SharePoint:
                 (By.CSS_SELECTOR,"div[class='row text-title']")
             )
         )
-        self.wait.until(
+        btn = self.wait.until(
             EC.presence_of_element_located(
                 (By.CSS_SELECTOR,"input[id='idSIButton9']")
             )
-        ).click()
-        
+        )
+        self.wait.until(EC.element_to_be_clickable(btn)).click()
         time.sleep(1)
         
         while not self.__readyState():
