@@ -102,68 +102,77 @@ if __name__ == "__main__":
         data = []
         for mail in MAILS:
             if mail.get("type") == 1:
+                mail_id = mail.get("mail_id")
                 if mail.get("sheet_name") == "KENTEC_1_T1_T6":
-                    result,note,attach = mail_dealer.reply(
-                        mail_id=mail.get("mail_id"),
-                        返信先="全員に返信",
-                        署名="署名なし",
-                        テンプレート=[
-                            "kaneka",
-                            "KKT Box"
-                        ],
-                    )
-                    data.append({**mail, "result": result, "note": note,"attach":attach})
+                    status = mail_dealer.get_status(mail_id)
+                    if status == "このメールは「返信処理中」です。" or status == None:
+                        result,note = mail_dealer.reply(
+                            mail_id=mail.get("mail_id"),
+                            返信先="全員に返信",
+                            署名="署名なし",
+                            テンプレート=[
+                                "kaneka",
+                                "KKT Box"
+                            ],
+                        )
+                        data.append({**mail, "result": result, "note": note})
+                    else:
+                        data.append({**mail, "result": False, "note": status})
                 if mail.get("sheet_name") == "KENTEC_2_T1_T6":
-                    result,note,attach = mail_dealer.reply(
-                        mail_id=mail.get("mail_id"),
-                        返信先="全員に返信",
-                        署名="署名なし",
-                        テンプレート=[
-                            "kaneka",
-                            "KFP Box"
-                        ],
-                    )
-                    data.append({**mail, "result": result, "note": note,"attach":attach})
+                    status = mail_dealer.get_status(mail_id)
+                    if status == "このメールは「返信処理中」です。" or status == None:
+                        result,note = mail_dealer.reply(
+                            mail_id=mail.get("mail_id"),
+                            返信先="全員に返信",
+                            署名="署名なし",
+                            テンプレート=[
+                                "kaneka",
+                                "KFP Box"
+                            ],
+                        )
+                        data.append({**mail, "result": result, "note": note})
+                    else:
+                        data.append({**mail, "result": False, "note": status})
             if mail.get("type") == 2:
                 mail_id:str = mail.get("mail_id")
                 folder = mail_id.replace("-1","")
                 # ----- #
-                site_url,files = share_point.get_files_in_folder(
-                    site_folder="/sites/2021/Shared Documents/は行/KANEKA JOB",
-                    folder=folder,
-                )
-                folders = [f for f in files if '.' not in f]
-                if not(folders and len(folders) == 1):
-                    data.append({**mail, "result": False, "note": "Không tìm thấy các file cần thiết"})
-                    continue
-                #----------#
-                folder = folders[0]
-                result,files = share_point.download_file(
-                    site_url=site_url,
-                    file_pattern=f"{folder}/.*.(pdf|xlsm|xlsx)$",
-                )
-                for file in os.listdir(SHAREPOINT_DOWNLOAD_PATH):
-                    if file.lower().endswith('.zip'):
-                        file_path = os.path.join(SHAREPOINT_DOWNLOAD_PATH, file)
-                        with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                            zip_ref.extractall(SHAREPOINT_DOWNLOAD_PATH)
-                        os.remove(file_path)
-                time.sleep(1)
-                files = [os.path.join(SHAREPOINT_DOWNLOAD_PATH,f) for f in files if re.search(r".*\.(pdf|xlsm|xlsx)$", f)]
-                if files:
-                    result,note,attach = mail_dealer.reply(
-                        mail_id=mail.get("mail_id"),
-                        返信先="全員に返信",
-                        署名="署名なし",
-                        テンプレート=[
-                            "kaneka",
-                            "KFP file attach"
-                        ],
-                        attached=files,
+                status = mail_dealer.get_status(mail_id)
+                if status == "このメールは「返信処理中」です。" or status == None:
+                    download_files = []
+                    site_url,files = share_point.get_files_in_folder(
+                        site_folder="/sites/2021/Shared Documents/は行/KANEKA JOB",
+                        folder=folder,
                     )
-                    data.append({**mail, "result": result, "note": note,"attach":attach})           
-        
-                    
+                    folders = [f for f in files if '.' not in f]
+                    for folder in folders:
+                        result,files = share_point.download_file(
+                            site_url=site_url,
+                            file_pattern=f"{folder}/.*.(pdf|xlsm|xlsx)$",
+                        )
+                        download_files.extend(files)
+                    for file in os.listdir(SHAREPOINT_DOWNLOAD_PATH):
+                        if file.lower().endswith('.zip'):
+                            file_path = os.path.join(SHAREPOINT_DOWNLOAD_PATH, file)
+                            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                                zip_ref.extractall(SHAREPOINT_DOWNLOAD_PATH)
+                            os.remove(file_path)
+                    time.sleep(1)
+                    if download_files:
+                        result,note = mail_dealer.reply(
+                            mail_id=mail.get("mail_id"),
+                            返信先="全員に返信",
+                            署名="署名なし",
+                            テンプレート=[
+                                "kaneka",
+                                "KFP file attach"
+                            ],
+                            attached=download_files,
+                        )
+                        data.append({**mail, "result": result, "note": note})           
+                else:
+                    data.append({**mail, "result": False, "note": status})           
+                                
         data = pd.DataFrame(data)
         data.to_excel(f"{datetime.today().strftime("%Y-%m-%d_%H-%M-%S") }.xlsx",index=False)
         break

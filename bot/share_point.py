@@ -87,7 +87,7 @@ class SharePoint:
         # -- Wait load page
         while not self.__readyState():
             continue
-        time.sleep(2)
+        time.sleep(4.5)
         if self.browser.current_url.startswith("https://m365.cloud.microsoft/?auth="):
             self.logger.info("✅ Xác thực thành công!")
             return True

@@ -66,8 +66,8 @@ class MailDealer:
                 self.browser.quit()
             except:
                 pass
-            
-   
+
+
     @HandleException
     def switch_to_default_content(func) : 
         def wrapper(self, *args, **kwargs):
@@ -272,62 +272,56 @@ class MailDealer:
             content = body.find_element(By.TAG_NAME,'pre').text
         self.logger.info(f'✅ Đã đọc được nội dung mail:{mail_id}. tab: {tab_name} ở box:{mail_box}')
         return content
-    
+
     @HandleException
+    @switch_to_default_content
     @login_required
-    def 一括操作(self,案件ID:any,このメールと同じ親番号のメールをすべて関連付ける:bool=False) -> tuple[bool,str]:
-        from selenium.common.exceptions import NoSuchElementException
+    def get_status(self,mail_id:str) -> str | None:
+        search_input = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"input[placeholder='このメールボックスのメール・電話を検索']"))
+        )
+        search_input.clear()
+        search_input.send_keys(mail_id)
+        # search
+        self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='検索']"))
+        )
+        search_btn = self.wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR,"button[title='検索']"))
+        )
+        search_btn.click()
+        # Wait loader
+        time.sleep(0.5)
+        WebDriverWait(self.browser, 120).until(
+            EC.invisibility_of_element_located((By.CSS_SELECTOR, "div[class='loader']"))
+        )
+        time.sleep(0.5)
+        # Switch frame
+        ifame = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"iframe[id='ifmMain']"))
+        )
+        self.browser.switch_to.frame(ifame)
+        # Check Maillist
         try:
-            popup = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='pop-panel__content']"))
+            self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR,"span[id='maillist']"))
             )
-            input = popup.find_element(By.ID,'fMatterID_add')
-            button = input.find_element(By.XPATH, "./ancestor::*[1]//button")
-            このメールと同じ親番号のメールをすべて関連付ける_div = popup.find_element(
-                By.XPATH,f"//div[text()='このメールと同じ親番号のメールをすべて関連付ける']"
-            )
-            div_checkbox = このメールと同じ親番号のメールをすべて関連付ける_div.find_element(By.XPATH, "./ancestor::*[1]//div")
-            div_input = このメールと同じ親番号のメールをすべて関連付ける_div.find_element(By.XPATH, "./ancestor::*[1]//input")
-            time.sleep(0.5)
-            if div_input.is_selected() != このメールと同じ親番号のメールをすべて関連付ける:
-                time.sleep(0.5)
-                div_checkbox.click()
-            time.sleep(1)
-            input.clear()
-            input.send_keys(案件ID)       
-            time.sleep(1)
-            button.click()
-            time.sleep(2)
-            # Check Result
-            snackbar_div = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='snackbar__msg']"))
-            )
-            if snackbar_div.text == "案件との関連付けを行いました。":
-                self.logger.info(f"Liên kết {案件ID}: {snackbar_div.text}")
-                return True,snackbar_div.text
-            else:
-                self.logger.info(f"Liên kết {案件ID}: {snackbar_div.text}")
-                return False,snackbar_div.text
-            
-        except TimeoutException as e:
-            button = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR,"button[title='一括操作']"))
-            )
-            button = self.wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button[title='一括操作']"))   
-            )
-            button.click()
-            return self.一括操作(
-                案件ID=案件ID,
-                このメールと同じ親番号のメールをすべて関連付ける=このメールと同じ親番号のメールをすべて関連付ける,
-            )
-        except NoSuchElementException as e:
-            self.logger.error(f'❌ Liên kết {案件ID} thất bại: {e}')
-            return False,e
-        except Exception as e:
-            self.logger.error(f'❌ Liên kết {案件ID} thất bại: {e}')
-            return False,e
+            self.logger.info(f"Không tìm thấy mail (id:{mail_id})")
+            return "NotFound"
+        except TimeoutException:
+            pass
+        olv_p_mail_page__content = self.wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,"div[class='olv-p-mail-page__content']"))
+        )
+        snackbar__wrap = olv_p_mail_page__content.find_elements(By.CSS_SELECTOR,"div[class='snackbar__wrap']")
+        if snackbar__wrap:
+            msg = ", ".join([e.text for e in snackbar__wrap])
+            self.logger.info(f"Mail Status {mail_id}: {msg}")
+            return msg
+        return None
         
+
+    @HandleException
     @switch_to_default_content
     @login_required 
     def reply(self,
@@ -440,22 +434,23 @@ class MailDealer:
             self.browser.maximize_window()
             # 
             time.sleep(5)
-            olv_p_mail_edit_section = self.wait.until(
-                EC.presence_of_element_located(
+            olv_p_mail_edit_sections = self.wait.until(
+                EC.presence_of_all_elements_located(
                     (By.CSS_SELECTOR,"section[class='olv-p-mail-edit__section']")
                 )
             )
-            olv_p_mail_edit__dl_olv_u_mbs:list[WebElement] = olv_p_mail_edit_section.find_elements(By.CSS_SELECTOR,"div[class^='olv-p-mail-edit__dl olv-u-mb--']")
-            for olv_p_mail_edit__dl_olv_u_mb in olv_p_mail_edit__dl_olv_u_mbs:
-                if olv_p_mail_edit__dl_olv_u_mb.find_elements(By.XPATH, ".//span[text()='To']"):
-                    olv_p_mail_edit__dd = olv_p_mail_edit__dl_olv_u_mb.find_element(By.CSS_SELECTOR,"div[class='olv-p-mail-edit__dd']")
-                    olv_p_mail_edit__dd_input = olv_p_mail_edit__dd.find_element(By.TAG_NAME,"input")
-                    ToEmail = olv_p_mail_edit__dd_input.get_attribute('value')
-                    match = re.search(r"<([^<>]+)>", ToEmail)
-                    if match:
-                        email:str = match.group(1)  
-                        last_name = email_to_lastname.get(email.lower(),"ご担当者")
-                    break
+            for olv_p_mail_edit_section in olv_p_mail_edit_sections:
+                olv_p_mail_edit__dl_olv_u_mbs:list[WebElement] = olv_p_mail_edit_section.find_elements(By.CSS_SELECTOR,"div[class^='olv-p-mail-edit__dl olv-u-mb--']")
+                for olv_p_mail_edit__dl_olv_u_mb in olv_p_mail_edit__dl_olv_u_mbs:
+                    if olv_p_mail_edit__dl_olv_u_mb.find_elements(By.XPATH, ".//span[text()='To']"):
+                        olv_p_mail_edit__dd = olv_p_mail_edit__dl_olv_u_mb.find_element(By.CSS_SELECTOR,"div[class='olv-p-mail-edit__dd']")
+                        olv_p_mail_edit__dd_input = olv_p_mail_edit__dd.find_element(By.TAG_NAME,"input")
+                        ToEmail = olv_p_mail_edit__dd_input.get_attribute('value')
+                        match = re.search(r"<([^<>]+)>", ToEmail)
+                        if match:
+                            email:str = match.group(1)  
+                            last_name = email_to_lastname.get(email.lower(),"ご担当者")
+                        break
                 
 
             if not email or not last_name:
@@ -492,7 +487,6 @@ class MailDealer:
                         break
             self.browser.switch_to.default_content()
             # -- Attached
-            attach = []
             if attached:
                 time.sleep(1)
                 for path in attached:
@@ -524,7 +518,6 @@ class MailDealer:
                         )
                         if alert.text == "添付可能なファイル容量の上限は20MBです。":
                             self.logger.info(f"Đính kèm {path} thất bại: 添付可能なファイル容量の上限は20MBです。")
-                            attach.append(path)
                             alert.accept()
                             success = False
                             error = "添付可能なファイル容量の上限は20MBです。"
@@ -544,10 +537,8 @@ class MailDealer:
                     #----------#
                     if not success:
                         self.logger.info(f"Đính kèm {path} thất bại")
-                        attach.append(path)
                         return success,error
                     self.logger.info(f"Đính kèm {path} thành công")    
-                    attach.append(path)
             
             while True:
                 try:
@@ -572,7 +563,7 @@ class MailDealer:
             self.browser.close()
             self.browser.switch_to.window(current_windows[0])     
             self.logger.info(f"Reply Mail {mail_id} thành công")
-            return True,content,attach      
+            return True,content      
         
             
               
