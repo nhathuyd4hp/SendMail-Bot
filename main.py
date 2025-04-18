@@ -36,7 +36,7 @@ class SheetMapping(StrEnum):
     def __str__(self):
         return self.value
        
-APP_SCRIPTS_URL = "https://script.google.com/macros/s/AKfycbzQ_W_YHoffYZc-V-AqFOayYk_RTIFgr_owPKLMzsf5pZDCUoMIH331sAHuFlLyJaVT/exec"
+APP_SCRIPTS_URL = "https://script.google.com/macros/s/AKfycbwUY_GGn7fsoQCr9Ouq9vz2DIADaEf-hNYtUcwRTM0xNYsJhE_b3HbYFisWnA_CRMDI/exec"
 SHAREPOINT_DOWNLOAD_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),"SharePoint")
 TIME_OUT = 10
 HEADLESS = False
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                         data.append({**mail, "result": result, "note": note})
                     else:
                         data.append({**mail, "result": False, "note": status})
-                if mail.get("sheet_name") == "KENTEC_2_T1_T6":
+                else:
                     status = mail_dealer.get_status(mail_id)
                     if status == "このメールは「返信処理中」です。" or status == None:
                         result,note = mail_dealer.reply(
@@ -174,5 +174,19 @@ if __name__ == "__main__":
                     data.append({**mail, "result": False, "note": status})           
                                 
         data = pd.DataFrame(data)
+        
         data.to_excel(f"{datetime.today().strftime("%Y-%m-%d_%H-%M-%S") }.xlsx",index=False)
+        # Lọc data dòng có data['result'] == True
+        if not data.empty:
+            data = data[data["result"] == True]
+            # Update Color
+            for _,row in data.iterrows():
+                sheet_id = row['sheet_id']
+                rows = row['row']
+                for index in rows:
+                    google_sheet.setColor(
+                        sheet_id=sheet_id,
+                        row=index,
+                        color=ColorMapping.GRAY,
+                    )
         break

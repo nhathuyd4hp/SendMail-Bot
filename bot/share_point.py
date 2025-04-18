@@ -278,7 +278,7 @@ class SharePoint:
                         )
                         button = name_gridcell.find_element(By.TAG_NAME,'button')
                         if button.text == folder:
-                            button.click()
+                            self.wait.until(EC.element_to_be_clickable(button)).click()
                             time.sleep(5) # Có thể tối ưu ở đây
                             break
             except TimeoutException:

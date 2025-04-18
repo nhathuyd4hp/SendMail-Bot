@@ -86,25 +86,25 @@ function doPost(e) {
     } else if (method === "PUT") {
       const row = jsonContents.row;
       const data = jsonContents.data;
+      const color = jsonContents.color;
+
       if (!row || row < 1) {
         return ContentService.createTextOutput(
           JSON.stringify({ error: "row is missing or invalid" })
         ).setMimeType(ContentService.MimeType.JSON);
       }
-      if (!data || !Array.isArray(data)) {
-        return ContentService.createTextOutput(
-          JSON.stringify({ error: "data is missing or invalid" })
-        ).setMimeType(ContentService.MimeType.JSON);
-      }
+
       const lastColumn = sheet.getLastColumn(); // Lấy số cột cuối cùng hiện có
-      sheet.getRange(row, 1, 1, lastColumn).clearContent();
-      // Ghi dữ liệu mới vào hàng đó
-      sheet.getRange(row, 1, 1, data.length).setValues([data]);
-      // -- Kiểm tra có tô màu không
-      const color = jsonContents.color;
+
+      if (data && Array.isArray(data)) {
+        sheet.getRange(row, 1, 1, lastColumn).clearContent();
+        sheet.getRange(row, 1, 1, data.length).setValues([data]);
+      }
+
       if (color) {
         sheet.getRange(row, 1, 1, lastColumn).setBackground(color);
       }
+
       return ContentService.createTextOutput(
         JSON.stringify({ success: "ok" })
       ).setMimeType(ContentService.MimeType.JSON);

@@ -53,7 +53,17 @@ class GoogleSheet:
         except requests.exceptions.ReadTimeout:
             return self.getSheet(sheet_id)
         
-    def setColor(self,sheet_id: Union[StrEnum,str],row,color:str) -> bool:
-        self.client.post()
+    def setColor(self,sheet_id: Union[StrEnum,str],row:int,color:Union[StrEnum,str],) -> bool:
+        sheet_id = sheet_id.value if isinstance(sheet_id,StrEnum) else sheet_id
+        color = color.value if isinstance(color,StrEnum) else color
+        response = self.client.post(
+            url = self.application_scripts_url,
+            json = {
+                "method":"PUT",
+                "sheet_id":sheet_id,
+                "row":row,
+                "color":color,
+            }
+        )
+        return "success" in response.text
         
-            
